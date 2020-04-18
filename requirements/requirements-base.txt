@@ -9,7 +9,7 @@ future>=0.16.0
 gensim==3.6.0
 # h5py==2.8.0
 html2text>=2018.1.9
-jupyter>=1.0.0,<3.0.0  # pandas>=0.23.4,<0.30.0
+jupyter  # pandas>=0.23.4,<0.30.0
 Keras==2.2.4
 Keras-Applications>=1.0.6
 Keras-Preprocessing>=1.0.5
@@ -23,7 +23,8 @@ opencv-python>=3.4.2,<3.5.0
 # pandas-datareader>=0.5.0
 # pandoc>=2.2.3,<3.0.0
 pathlib>=1.0.1,<2.0.0
-pillow>=5.2.0,<6.0.0
+# pillow>=5.2.0,<6.0.0
+pillow==6.2.0
 pip>=18.0
 plac>=0.9.6,<1.0.0  # thinc==6.10.3 requires plac<1.0.0
 plotly==3.3.0
@@ -41,7 +42,7 @@ scipy>=1.1.0
 seaborn>=0.8
 setuptools>=40.8.0
 spacy==2.0.18
-tensorflow==1.13.1
+tensorflow==1.15.2
 tensorflow-hub>=0.4.0
 theano==1.0.2
 tqdm>=4.11.2
