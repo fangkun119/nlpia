@@ -77,6 +77,9 @@ src/nlpia/bigdata/*.tgz
 envs/
 record.txt
 
+# Virtualenv
+nlpiaenv/
+
 # Backups
 *.bak.*
 *.old.*
