@@ -3,8 +3,8 @@
 ## Readme.md
 
 * [Readme.md](../docs/README.md)</br>
-* [Code Examples: ](https://github.com/fangkun119/nlpia/tree/master/src/nlpia/book/examples)</br>
-* [Code Examples (2nd edition)](https://github.com/fangkun119/nlpia/tree/master/src/nlpia/second_edition)</br>
+* [Code Examples: (markdown and python)](https://github.com/fangkun119/nlpia/tree/master/src/nlpia/book/examples)</br>
+* [Code Examples for 2nd Edition (markdown and python)](https://github.com/fangkun119/nlpia/tree/master/src/nlpia/second_edition)</br>
 
 ## Data-Science
 
