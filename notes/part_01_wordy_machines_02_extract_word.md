@@ -515,9 +515,145 @@ example
 +0.3254: It was OK. Some good and some bad things.
 ~~~
 
+drawback is it is hard to add new words besides the predifined words in the text
+
 ### 2.3.2. Naive Bayes
 
-> relies on a labeled set of statements or documents to train a machine learning model to create those rules (labels can come from user rating, user's hashtag, ...)
+> model relies on a labeled set of statements or documents to train a machine learning model to create those rules (labels can come from user rating, user's hashtag, ...)
+
+<b>Naive Bayes</b> try to find keywords in a set of documents that are predictive of your `target` (`output`, in this example it is `sentiment`) variable 
+
+<b>VIDIA</b>: is a model with sentimental data-set named `hutto`, below is the text in the data set
+
+> will require to install `nlpia` as described in [http://github.com/totalgood/nlpia](http://github.com/totalgood/nlpia)</br>
+
+~~~python
+>>> from nlpia.data.loaders import get_data
+>>> movies = get_data('hutto_movies')
+>>> movies.head().round(2)
+    sentiment                                            text
+id
+1        2.27  The Rock is destined to be the 21st Century...
+2        3.53  The gorgeously elaborate continuation of ''...
+3       -0.60                     Effective but too tepid ...
+4        1.47  If you sometimes like to go to the movies t...
+5        1.73  Emerges as something rare, an issue movie t...
+>>> movies.describe().round(2)
+       sentiment
+count   10605.00
+mean        0.00
+min        -3.88
+max         3.94
+~~~
+
+below is the `bow` (`bag of words`) from movie review text we want to predict
+
+~~~python
+>>> import pandas as pd
+>>> pd.set_option('display.width', 75)
+>>> from nltk.tokenize import casual_tokenize
+>>> bags_of_words = []
+>>> from collections import Counter
+>>> for text in movies.text:
+...    bags_of_words.append(Counter(casual_tokenize(text)))
+>>> df_bows = pd.DataFrame.from_records(bags_of_words)
+>>> df_bows = df_bows.fillna(0).astype(int)
+>>> df_bows.shape
+(10605, 20756)
+>>> df_bows.head()
+   !  "  #  $  %  &  ' ...  zone  zoning  zzzzzzzzz  ½  élan  -  '
+0  0  0  0  0  0  0  4 ...     0       0          0  0     0  0  0
+1  0  0  0  0  0  0  4 ...     0       0          0  0     0  0  0
+2  0  0  0  0  0  0  0 ...     0       0          0  0     0  0  0
+3  0  0  0  0  0  0  0 ...     0       0          0  0     0  0  0
+4  0  0  0  0  0  0  0 ...     0       0          0  0     0  0  0
+>>> df_bows.head()[list(bags_of_words[0].keys())]
+   The  Rock  is  destined  to  be ...  Van  Damme  or  Steven  Segal  .
+0    1     1   1         1   2   1 ...    1      1   1       1      1  1
+1    2     0   1         0   0   0 ...    0      0   0       0      0  4
+2    0     0   0         0   0   0 ...    0      0   0       0      0  0
+3    0     0   1         0   4   0 ...    0      0   0       0      0  1
+4    0     0   0         0   0   0 ...    0      0   0       0      0  1
+~~~
+
+using ‘Naive Bayes’ to predict ‘ho, the precision is as good as 0.93
+
+~~~python
+>>> from sklearn.naive_bayes import MultinomialNB
+>>> nb = MultinomialNB()
+>>> nb = nb.fit(df_bows, movies.sentiment > 0)
+>>> movies['predicted_sentiment'] =\
+...   nb.predict_proba(df_bows) * 8 - 4
+>>> movies['error'] = (movies.predicted_sentiment - movies.sentiment).abs()
+>>> movies.error.mean().round(1)
+2.4
+>>> movies['sentiment_ispositive'] = (movies.sentiment > 0).astype(int)
+>>> movies['predicted_ispositiv'] = (movies.predicted_sentiment > 0).astype(int)
+>>> movies['''sentiment predicted_sentiment sentiment_ispositive\
+...   predicted_ispositive'''.split()].head(8)
+    sentiment  predicted_sentiment  sentiment_ispositive  predicted_ispositive
+id
+1    2.266667                   4                    1                    1
+2    3.533333                   4                    1                    1
+3   -0.600000                  -4                    0                    0
+4    1.466667                   4                    1                    1
+5    1.733333                   4                    1                    1
+6    2.533333                   4                    1                    1
+7    2.466667                   4                    1                    1
+8    1.266667                  -4                    1                    0
+>>> (movies.predicted_ispositive ==
+...   movies.sentiment_ispositive).sum() / len(movies)
+0.9344648750589345
+~~~
+
+better when moving to another dataset `hotto_products`, the product sentimental predict is poor, one reason is the difference between `product` dataset and `movie dataset` and another reason is negation words (such as “not” or “never”) are not connected by `n-grams`
+
+~~~python
+>>> products = get_data('hutto_products')
+...    bags_of_words = []
+>>> for text in products.text:
+...    bags_of_words.append(Counter(casual_tokenize(text)))
+>>> df_product_bows = pd.DataFrame.from_records(bags_of_words)
+>>> df_product_bows = df_product_bows.fillna(0).astype(int)
+>>> df_all_bows = df_bows.append(df_product_bows)
+>>> df_all_bows.columns
+Index(['!', '"', '#', '#38', '$', '%', '&', ''', '(', '(8',
+       ...
+       'zoomed', 'zooming', 'zooms', 'zx', 'zzzzzzzzz', '~', '½', 'élan',
+       '-', '''],
+      dtype='object', length=23302)
+>>> df_product_bows = df_all_bows.iloc[len(movies):][df_bows.columns]
+>>> df_product_bows.shape
+(3546, 20756)
+>>> df_bows.shape
+(10605, 20756)
+>>> products[ispos] = 
+ (products.sentiment > 0).astype(int)
+>>> products['predicted_ispositive'] = 
+ nb.predict(df_product_bows.values).astype(int)
+>>> products.head()
+id  sentiment                                     text      ispos  pred
+0  1_1      -0.90  troubleshooting ad-2500 and ad-2600 ...      0     0
+1  1_2      -0.15  repost from january 13, 2004 with a ...      0     0
+2  1_3      -0.20  does your apex dvd player only play ...      0     0
+3  1_4      -0.10  or does it play audio and video but ...      0     0
+4  1_5      -0.50  before you try to return the player ...      0     0
+>>> (products.pred == products.ispos).sum() / len(products)
+0.5572476029328821
+~~~
+
+for real evaluation by splitting dataset into testing and training set, see [Appendix 4]()
+
+## 2.4 Summary
+
+> * You implemented tokenization and configured a tokenizer for your application.
+> * n-gram tokenization helps retain some of the word order information in a document.
+> * Normalization and stemming consolidate words into groups that improve the “recall” for search engines but reduce precision.
+> * Lemmatization and customized tokenizers like casual_tokenize() can improve precision and reduce information loss.
+> * Stop words can contain useful information, and discarding them is not always helpful
+
+
+
 
 
 
