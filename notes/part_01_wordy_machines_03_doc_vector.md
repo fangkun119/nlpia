@@ -6,6 +6,15 @@
 > * `Bags of n-grams`: Counts of word pairs (bigrams), triplets (trigrams), and so on
 > * `TF-IDF vectors`: Word scores that better represent their importance
 
+code: 
+
+> * [ch03.md](../src/nlpia/book/examples/ch03.md)
+> * [ch03.py](../src/nlpia/book/examples/ch03.py)
+> * [ch03-2.py](../src/nlpia/book/examples/ch03-2.py)
+> * [ch03_2.ipynb](../src/nlpia/book/examples/ch03_2.ipynb)
+> * [ch03_zipf.py](../src/nlpia/book/examples/ch03_zipf.py)
+> * [ch03_bm25.py](../src/nlpia/book/examples/ch03_bm25.py)
+
 ## 3.1. Bag of words
 
 `Binary BOW` (Chapter 02) : 
@@ -239,6 +248,7 @@ a.dot(b) == np.linalg.norm(a) * np.linalg.norm(b) / np.cos(theta)
 
 `Zipf’s law` states that given some corpus of natural language utterances, the frequency of any word is inversely proportional to its rank in the frequency table (`Zipf定律`表示语料库中词的词频的log，与其在词频表中的Rank的log成反比). 
 
+> * code similuation: [ch03_zipf.py](../src/nlpia/book/examples/ch03_zipf.py)
 > * The first item in the ranked list will appear twice as often as the second, and three times as often as the third, ... 
 > * It can also applied to many other things ([https://www.nature.com/articles/srep00812](https://www.nature.com/articles/srep00812)), such as population dynamics, economic output, and resource distribution
 
@@ -520,6 +530,52 @@ q_idf * dot(q_tf, d_tf[i]) * 1.5 /
  (dot(q_tf, d_tf[i]) + .25 + .75 * d_num_words[i] / d_num_words.mean()))
 ~~~
 
+example: 
+
+~~~python
+
+from collections import Counter
+
+import pandas as pd
+from seaborn import plt
+from mpl_toolkits.mplot3d import Axes3D
+
+from nltk.tokenize import TreebankWordTokenizer
+from sklearn.feature_extraction import TfidfVectorizer
+
+CORPUS = ['"Hello world!"', 'Go fly a kite.', 'Kite World', 'Take a flying leap!', 'Should I fly home?']
+
+
+def tfidf_corpus(docs=CORPUS):
+    """ Count the words in a corpus and return a TfidfVectorizer() as well as all the TFIDF vecgtors for the corpus
+
+    Args:
+      docs (iterable of strs): a sequence of documents (strings)
+
+    Returns:
+      (TfidfVectorizer, tfidf_vectors)
+    """
+    vectorizer = TfidfVectorizer()
+    vectorizer = vectorizer.fit(docs)
+    return vectorizer, vectorizer.transform(docs)
+
+
+def BM25Score(query_str, vectorizer, tfidfs, k1=1.5, b=0.75):
+    query_tfidf = vectorizer.transform([query_str])[0]
+    scores = []
+
+    for idx, doc in enumerate(self.DocTF) :
+        commonTerms = set(dict(query_bow).keys()) & set(doc.keys())
+        tmp_score = []
+        doc_terms_len = self.DocLen[idx]
+        for term in commonTerms :
+            upper = (doc[term] * (k1+1))
+            below = ((doc[term]) + k1*(1 - b + b*doc_terms_len/self.DocAvgLen))
+            tmp_score.append(self.DocIDF[term] * upper / below)
+        scores.append(sum(tmp_score))
+    return scores
+~~~
+
 ### 3.4.6. What’s next
 
 > if your corpus isn’t too large, you might consider forging ahead with us into even more useful and accurate representations of the meaning of words and documents
@@ -528,84 +584,3 @@ q_idf * dot(q_tf, d_tf[i]) * 1.5 /
 >
 > * it is much better than anything TF-IDF weighting and stemming and lemmatization can ever hope to achieve
 > * just semantic word and topic vectors don’t scale to billions of documents
-
-# appendix
-
-```python
->>> import pandas as pd
->>> from seaborn import plt
->>> from mpl_toolkits.mplot3d import Axes3D
->>> >>> from nltk.tokenize import TreebankWordTokenizer
-... >>> sentence = "The faster Harry got to the store, the faster and faster Harry would get home."
-... >>> tokenizer = TreebankWordTokenizer()
-... >>> token_sequence = tokenizer.tokenize(sentence)
-...
->>> vocab = ['faster', 'Harry', 'home']
-... Counter(tok for tok in token_sequence if tok in vocab)
-... tokenize = tokenizer.tokenize
-... vector3 = Counter(tok for tok in tokenize("Jill is not as hairy as Harry.") if tok in lexicon)
-... lexicon = ['faster', 'Harry', 'home']
-... vector3 = Counter(tok for tok in tokenize("Jill is not as hairy as Harry.") if tok in lexicon)
-... vector3
-... corpus = [vector1, vector2, vector3]
-... vector3 = Counter(tok for tok in tokenize("The faster Harry got to the store, the faster and faster Harry would get home.") if tok in lexicon)
-... vector3 = Counter(tok for tok in tokenize("Jill is not as hairy as Harry.") if tok in lexicon)
-... vector1 = Counter(tok for tok in tokenize("The faster Harry got to the store, the faster and faster Harry would get home.") if tok in lexicon)
-... corpus = [vector1, vector2, vector3]
-...
->>> from collections import Counter
->>> vocab = ['faster', 'Harry', 'home']
-... Counter(tok for tok in token_sequence if tok in vocab)
-... tokenize = tokenizer.tokenize
-... vector3 = Counter(tok for tok in tokenize("Jill is not as hairy as Harry.") if tok in lexicon)
-... lexicon = ['faster', 'Harry', 'home']
-... vector3 = Counter(tok for tok in tokenize("Jill is not as hairy as Harry.") if tok in lexicon)
-... vector3
-... corpus = [vector1, vector2, vector3]
-... vector3 = Counter(tok for tok in tokenize("The faster Harry got to the store, the faster and faster Harry would get home.") if tok in lexicon)
-... vector3 = Counter(tok for tok in tokenize("Jill is not as hairy as Harry.") if tok in lexicon)
-... vector1 = Counter(tok for tok in tokenize("The faster Harry got to the store, the faster and faster Harry would get home.") if tok in lexicon)
-... corpus = [vector1, vector2, vector3]
-...
->>> lexicon = vocab
->>> vocab = ['faster', 'Harry', 'home']
-... Counter(tok for tok in token_sequence if tok in vocab)
-... tokenize = tokenizer.tokenize
-... vector3 = Counter(tok for tok in tokenize("Jill is not as hairy as Harry.") if tok in lexicon)
-... lexicon = ['faster', 'Harry', 'home']
-... vector3 = Counter(tok for tok in tokenize("Jill is not as hairy as Harry.") if tok in lexicon)
-... vector3
-... corpus = [vector1, vector2, vector3]
-... vector3 = Counter(tok for tok in tokenize("The faster Harry got to the store, the faster and faster Harry would get home.") if tok in lexicon)
-... vector3 = Counter(tok for tok in tokenize("Jill is not as hairy as Harry.") if tok in lexicon)
-... vector1 = Counter(tok for tok in tokenize("The faster Harry got to the store, the faster and faster Harry would get home.") if tok in lexicon)
-... corpus = [vector1, vector2, vector3]
-...
->>> vector1 = Counter(tok for tok in tokenize("The faster Harry got to the store, the faster and faster Harry would get home." ) if tok in lexicon)
->>> vector2
->>> vector2 = Counter(tok for tok in tokenize("Harry is hairy and faster than Jill.") if tok in lexicon)
->>> vector3 = Counter(tok for tok in tokenize("Jill is faster than Harry.") if tok in lexicon)
->>> vector2 = Counter(tok for tok in tokenize("Jill is faster than Harry.") if tok in lexicon)
->>> vector3 = Counter(tok for tok in tokenize("Jill and Harry fast.") if tok in lexicon)
->>> 
-... corpus = [vector1, vector2, vector3]
-...
->>> corpus
-[Counter({'Harry': 2, 'faster': 3, 'home': 1}),
- Counter({'Harry': 1, 'faster': 1}),
- Counter()]
->>> df = pd.DataFrame.from_records(corpus)
->>> df = df.fillna(0)
->>> df
-   Harry  faster  home
-0    2.0     3.0   1.0
-1    1.0     1.0   0.0
-2    1.0     0.0   0.0
->>> fig = plt.figure()
->>> ax = fig.add_subplot(111, projection='3d')
->>> ax.scatter3D(df.Harry, df.faster, df.home, s=20 * df.T.sum(), c = ['r', 'g', 'b'])
->>> plt.xlabel('Harry')
->>> plt.ylabel('faster')
->>> ax.set_zlabel('home')
->>> plt.show()
-```
