@@ -2,35 +2,6 @@
 
 ## code of this chapter
 
-> LSA
->
-> * [ch04_catdog_lsa_3x6x16.py](../src/nlpia/book/examples/ch04_catdog_lsa_3x6x16.py)
-> * [ch04_catdog_lsa_4x8x200.py](../src/nlpia/book/examples/ch04_catdog_lsa_4x8x200.py)
-> * [ch04_catdog_lsa_9x4x12.py](../src/nlpia/book/examples/ch04_catdog_lsa_9x4x12.py)
-> * [ch04_catdog_lsa_sorted.py](../src/nlpia/book/examples/ch04_catdog_lsa_sorted.py)
-> * [ch04_stanford_lsa.py](../src/nlpia/book/examples/ch04_stanford_lsa.py)
-> 
-> LDA
->
-> * [ch04_spam_lda.py](../src/nlpia/book/examples/ch04_spam_lda.py)
-> > PCA
-> 
-> * [ch04_sklearn_pca_source.py](../src/nlpia/book/examples/ch04_sklearn_pca_source.py)
->
-> SVD 
-> 
-> * [ch04.svdfail.py](../src/nlpia/book/examples/ch04.svdfail.py)
-> 
-> examples of this chapter
-> 
-> * [ch04.py](../src/nlpia/book/examples/ch04.py)
-> 
-> others
-> 
-> * [ch4_fix_accuracy_discrepancy.py](../src/nlpia/book/examples/ch4_fix_accuracy_discrepancy.py)
-> * [ch04_horse.py](../src/nlpia/book/examples/ch04_horse.py)
-> * [ch04_ldia_comparison.py](../src/nlpia/book/examples/ch04_ldia_comparison.py)
-
 ## Introduction
 
 <b>`tf-idf vectors`</b>: can be used to represent importance of `words`, `word sequences`, `n-grams` in a chunk of text</br>
@@ -696,37 +667,711 @@ sms5!     1  FreeMsg Hey there darling it's been 3 week's n...
 
 > since the larger number of tokens compared with message number, as well as the un-balanced data-set, this data-set will cause [overfitting](https://en.wikipedia.org/wiki/Overfitting)
 
+> approach to prevent this overfitting: 
 > 
-
-
-
-
+> * <b>reducing the “reward” of the classfication</b> of the `majority side(non-spam sms)`: can not solve the `large vocabulary size` problem 
+>
+> 	* large vocabulary size but only a few are connected with spam, and spammers could easily get around your filter if they just used synonyms for those spammy words)
+>	* couldn’t find a big database of SMS messages that included all the different ways people say spammy and nonspammy things
+>
+> * <b>dimension reduction</b>: make NLP pipeline more ‘general’ by consolidating your dimensions (words) into a smaller number of dimensions (topics)
+> 	* `LSA`: generalizes from your small dataset by assuming a linear relationship between word counts
+>	* `for example`: if `half` and `off` occurs together in spam sms, `LSA` will generalize from `half off` to `80% off`, even generalize to `80% discount` (if some data in the data set could connect `discount` with the word `off`
 
 ### 4.4.3. Using PCA for SMS message semantic analysis
 
+> try the `PCA model` first 
+
+> wrangle dataset of `9,232-D TF-IDF vectors` into `16-D topic vectors`
+
+~~~python
+>>> from sklearn.decomposition import PCA
+ 
+>>> pca = PCA(n_components=16)
+>>> pca = pca.fit(tfidf_docs)
+>>> pca_topic_vectors = pca.transform(tfidf_docs)
+>>> columns = ['topic{}'.format(i) for i in range(pca.n_components)]
+>>> pca_topic_vectors = pd.DataFrame(pca_topic_vectors, columns=columns,\
+...     index=index)
+>>> pca_topic_vectors.round(3).head(6) # the 16-D topics vectors
+       topic0  topic1  topic2   ...     topic13  topic14  topic15
+sms0    0.201   0.003   0.037   ...      -0.026   -0.019    0.039
+sms1    0.404  -0.094  -0.078   ...      -0.036    0.047   -0.036
+sms2!  -0.030  -0.048   0.090   ...      -0.017   -0.045    0.057
+sms3    0.329  -0.033  -0.035   ...      -0.065    0.022   -0.076
+sms4    0.002   0.031   0.038   ...       0.031   -0.081   -0.021
+sms5!  -0.016   0.059   0.014   ...       0.077   -0.015    0.021
+~~~
+
+> assign words to all the dimensions in your PCA transformation
+
+~~~python
+>>> tfidf.vocabulary_  #tfidf terms
+{'go': 3807,
+ 'until': 8487,
+ 'jurong': 4675,
+ 'point': 6296,
+...
+>>> # align tf-idf terms with pca component index
+>>> column_nums, terms = zip(*sorted(zip(tfidf.vocabulary_.values(), tfidf.vocabulary_.keys()))) 
+>>> terms
+('!',
+ '"',
+ '#',
+ '#150',
+...
+>>> weights = pd.DataFrame(pca.components_, columns=terms,index=['topic{}'.format(i) for i in range(16)])
+>>> pd.options.display.max_columns = 8
+>>> weights.head(4).round(3)
+            !      "      #  ...      ...      ?    ?ud      ?
+topic0 -0.071  0.008 -0.001  ...   -0.002  0.001  0.001  0.001
+topic1  0.063  0.008  0.000  ...    0.003  0.001  0.001  0.001
+topic2  0.071  0.027  0.000  ...    0.002 -0.001 -0.001 -0.001
+topic3 -0.059 -0.032 -0.001  ...    0.001  0.001  0.001  0.001
+
+>>> # we are not interested with the term above, try another 12 terms as our topic term
+>>> # term: ! ;) :) half off  free  crazy  deal  only    $   80    %
+>>> pd.options.display.max_columns = 12
+>>> deals = weights['! ;) :) half off free crazy deal only $ 80 %'.split()].r
+     ound(3) * 100
+>>> deals
+            !   ;)    :)  half  off  free  crazy  deal  only    $   80    %
+topic0   -7.1  0.1  -0.5  -0.0 -0.4  -2.0   -0.0  -0.1  -2.2  0.3 -0.0 -0.0
+topic1    6.3  0.0   7.4   0.1  0.4  -2.3   -0.2  -0.1  -3.8 -0.1 -0.0 -0.2
+topic2    7.1  0.2  -0.1   0.1  0.3   4.4    0.1  -0.1   0.7  0.0  0.0  0.1
+topic3   -5.9 -0.3  -7.1   0.2  0.3  -0.2    0.0   0.1  -2.3  0.1 -0.1 -0.3
+topic4   38.1 -0.1 -12.5  -0.1 -0.2   9.9    0.1  -0.2   3.0  0.3  0.1 -0.1
+topic5  -26.5  0.1  -1.5  -0.3 -0.7  -1.4   -0.6  -0.2  -1.8 -0.9  0.0  0.0
+topic6  -10.9 -0.5  19.9  -0.4 -0.9  -0.6   -0.2  -0.1  -1.4 -0.0 -0.0 -0.1
+topic7   16.4  0.1 -18.2   0.8  0.8  -2.9    0.0   0.0  -1.9 -0.3  0.0 -0.1
+topic8   34.6  0.1   5.2  -0.5 -0.5  -0.1   -0.4  -0.4   3.3 -0.6 -0.0 -0.2
+topic9    6.9 -0.3  17.4   1.4 -0.9   6.6   -0.5  -0.4   3.3 -0.4 -0.0  0.0
+...
+>>> deals.T.sum()
+topic0    -11.9 # anti “deal” topic sentiment
+topic1      7.5
+topic2     12.8
+topic3    -15.5 # anti “deal” topic sentiment
+topic4     38.3 # positive “deal” topic sentiment
+topic5    -33.8 # anti “deal” topic sentiment
+topic6      4.8
+topic7     -5.3
+topic8     40.5 # positive “deal” topic sentiment
+topic9     33.1 # positive “deal” topic sentiment
+...
+~~~
+
+> <b>notice</b>: 
+> 
+> * `casual_tokenize` tokenizer splits "80%" into ["80", "%"] and "$80 million" into ["$", 80", "million"]. So unless using `LSA` or a `2-gram` tokenizer, the `NLP pipeline` wouldn’t notice the difference between `80%` and `$80 million` (both share token `80`)
+> * `LSA` only allows for `linear relationships between words` and work with a `small corpus` 
+
+> <b>the topics</b> 
+> 
+> * tend to combine words in ways that humans don’t find all that meaningful. 
+> * several words from different topics will be crammed together into a single dimension (principle component) in order to make sure the model captures as much variance in usage of your 9,232 words as possible
+
 ### 4.4.4. Using truncated SVD for SMS message semantic analysis
+
+`truncated SVD`
+
+> * this PCA wrapper is a more direct approach to LSA that bypasses the scikit-learn PCA model
+> * it can handle `sparse matrices` thus is suitable for `large dataset` than PCA
+> * `TruncatedSVD`
+>	* discard the dimensions represent the “topics” (linear combinations of words) that vary the least 
+> 	* these discarded dimensions have least information, which likely contains a lot of stop words and other words
+
+~~~python
+>>> from sklearn.decomposition import TruncatedSVD
+ 
+>>> svd = TruncatedSVD(n_components=16, n_iter=100)
+>>> svd_topic_vectors = svd.fit_transform(tfidf_docs.values)
+>>> svd_topic_vectors = pd.DataFrame(svd_topic_vectors, columns=columns,\
+...     index=index)
+>>> svd_topic_vectors.round(3).head(6)
+       topic0  topic1  topic2   ...     topic13  topic14  topic15
+sms0    0.201   0.003   0.037   ...      -0.036   -0.014    0.037
+sms1    0.404  -0.094  -0.078   ...      -0.021    0.051   -0.042
+sms2!  -0.030  -0.048   0.090   ...      -0.020   -0.042    0.052
+sms3    0.329  -0.033  -0.035   ...      -0.046    0.022   -0.070
+sms4    0.002   0.031   0.038   ...       0.034   -0.083   -0.021
+sms5!  -0.016   0.059   0.014   ...       0.075   -0.001    0.020
+~~~
+
+> this `TruncatedSVD` output is exactly the same as previouse `PCA` output for below reasons: 
+> 
+> * same `n_components` with value `16`
+> * large enough value of `n_iter` for `TruncatedSVD` with value `100`
+> * `tf-idf` frequencies for each term (column) were `centered on zero`
 
 ### 4.4.5. How well does LSA work for spam classification?
 
+step 1: `cosine similarity` between `documents pairs` 
+
+~~~python
+>>> import numpy as np
+ 
+>>> svd_topic_vectors = (svd_topic_vectors.T / np.linalg.norm(\
+...     svd_topic_vectors, axis=1)).T
+>>> svd_topic_vectors.iloc[:10].dot(svd_topic_vectors.iloc[:10].T).round(1)
+       sms0  sms1   sms2!  sms3  sms4  sms5!  sms6  sms7  sms8!  sms9!
+sms0    1.0   0.6   -0.1*  0.6  -0.0   -0.3* -0.3  -0.1   -0.3*  -0.3* # low  val with spam
+sms1    0.6   1.0   -0.2   0.8  -0.2    0.0  -0.2  -0.2   -0.1   -0.1
+sms2!  -0.1  -0.2    1.0* -0.2   0.1    0.4*  0.0   0.3    0.5*   0.4* # high val with spam
+sms3    0.6   0.8   -0.2   1.0  -0.2   -0.3  -0.1  -0.3   -0.2   -0.1
+sms4   -0.0  -0.2    0.1  -0.2   1.0    0.2   0.0   0.1   -0.4   -0.2
+sms5!  -0.3   0.0    0.4  -0.3   0.2    1.0  -0.1   0.1    0.3    0.4
+sms6   -0.3  -0.2    0.0  -0.1   0.0   -0.1   1.0   0.1   -0.2   -0.2
+sms7   -0.1  -0.2    0.3  -0.3   0.1    0.1   0.1   1.0    0.1    0.4
+sms8!  -0.3  -0.1    0.5  -0.2  -0.4    0.3  -0.2   0.1    1.0    0.3
+sms9!  -0.3  -0.1    0.4  -0.1  -0.2    0.4  -0.2   0.4    0.3    1.0
+~~~
+
+> * sms 0 (non spam): has low similarity with spam sms (sms 2,5,8,9)</br>
+> * sms 2 (spam): has high similarity with other spam sms (sms 5,8,9)</br>
+> * for a query document (sms), we can calculate similarity with all sms and find the most similar one </br>
+
+`spaminess` is one of the “meaning”s mixed into the topics, however: 
+> * similarity between each topic and spaminess is not maintained for all sms
+> * hard to find the threshold of similarity between `query sms` and a message for classification
+> * good news is that, in general, the less spammy the sms is, the less similarity it is from another spam sms 
+
+normalize the eigenvalues, which helps give more weight on rare topic like `spamness`, including:  
+
+> * normalize `tf-idf` vectors by length (`L2-norm`)
+> * centering `tf-idf` term frequencies by subtracting the `mean frequency` for `each term (word)`
+>
+> this will be done automatically if using `TruncatedSVD` of `sklearn` lib (`Sigma` or `S` parameter), and might need to be done manually if using you own `SVD` implementation 
+
+general tips: 
+
+> * normalize `BOW` or `TF-IDF` vectors no matter which one (LSA, PCA, SVD, truncated SVD, LDiA) is used
+> * otherwise, it may end up with large scale differences between topics
+
+### 4.4.6 LSA and SVD enhancements
+
+> thery are enhancement mostly for non-NLP problems, but might be useful in situations such as:  
+>
+> * `behavior-based recommendation engines` alongside NLP content-based recommendation engines
+> * `natural language part-of-speech statistics`: [link](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.332.629&rep=rep1&type=pdf)
+
+enhancements: 
+
+> * Quadratic discriminant analysis (QDA)
+> * Random projection
+> * Nonnegative matrix factorization (NMF)
+
+QDA: Quadratic discriminant analysis 
+
+> * `quadratic(平方) polynomial transformations` rather than `linear transformation`
+> * vector space defined by the transformation can be used to discriminate between classes
+> * the boundary between classes is quadratic, curved, like a bowl or sphere or halfpipe
+
+Random projection
+
+> * like `SVD` but the algorithm is stochastic
+> * each time it is running will return a different output, but is suitable for parallel machines 
+> * seldom used in `NLP` but 
+
+NMF: Nonnegative matrix factorization
+
+
 ## 4.5. Latent Dirichlet allocation (LDiA)
+
+> for most `topic modeling`, `semantic search`, or `content-based recommendation engines` 
+>
+> * `LSA` should be the first choice: 
+>	* LSA is straightforward, efficient, the transformation can be used on new batch without training and with little loss in accuracy 
+> * `LDiA` give slightly better results in some situations: 
+>	* it assumes a `Dirichlet distribution` of word frequencies. It’s more precise than the linear math of LSA
+> 	* the approach is similar with the `thought experiment` (words assigned to topic, topics assign to document) in earlier part of this chapter, which makes the topic model much easier to understand
+>		* it assumes each document is a mixture (linear combination) of some arbitrary number of topics
+>		* it also assumes each topic can be represented by a distribution of words (term frequencies)
+>  * it more understandable and “explainable” to humans  because words frequently occur together are assigned the same topics
+
+Reference: 
+
+> “[Comparing LDA and LSA Topic Models for Content-Based Movie Recommendation Systems](https://www.dbgroup.unimo.it/~po/pubs/LNBI_2015.pdf)” by Sonia Bergamaschi and Laura Po.
 
 ### 4.5.1. The LDiA idea
 
+Reference: 
+
+> “[Inference of Popluation Structure Using Multilocus Genotype Data](http://www.genetics.org/content/155/2/945)”, by Jonathan K. Pritchard, Matthew Stephens, and Peter Donnelly” </br>
+> “[Latent Dirichlet Allocation](http://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf)” by David M. Blei, Andrew Y. Ng, and Michael I. Jordan </br>
+
+The thought behind `LDiA`: 
+
+> 1. a machine for writing the docment with the `BOW` out of your corpus: 
+> 	* BOW cut out the sequence relationships among words
+>	* only the statistics for the mix of words can be relied
+> 2. the machine started with 2 random numbers: 
+> 	* number of words to generate for the document (`Poisson distribution`)
+>	* number of topics to mix together for the document (`Dirichlet distribution`)
+> 3. choosing the words for a document until hits the words number limitation: 
+>	* iterates over those topics
+>	* randomly chooses words appropriate to that topic
+> 4. step 3 needs to know the `ppropriateness of words for each topic`, which is stored in the `term-topic probabilities matrix`
+> 
+
+hyper-parameters for `LDiA`: 
+
+> * a single parameter for the `Poisson distribution` in `step 2`, which is tells what the `“average” document length` should be 
+> * a couple more parameters to define that `Dirichlet distribution` that sets up the `number of topics` 
+>
+> code for determing the 1st parameter: `”average” document length` 
+
+~~~python
+>>> # remember calculate directly on BOWs (after tokenize, stop-word filtering, normalizations, ...)
+
+>>> # approahc 1
+>>> total_corpus_len = 0
+>>> for document_text in sms.text:
+...     total_corpus_len += len(casual_tokenize(document_text))
+>>> mean_document_len = total_corpus_len / len(sms)
+>>> round(mean_document_len, 2)
+21.35
+
+>>> # appraoch 2
+>>> sum([len(casual_tokenize(t)) for t in sms.text]) * 1. / len(sms.text)
+21.35
+~~~
+
+> for determing the 2nd parameter: “the number of topics”
+>
+> * guess the number and than check if it works (analogous to the k in k-means, the number of “clusters”) 
+> * you can automate this optimization if you can measure something about the quality of your LDiA language model
+
 ### 4.5.2. LDiA topic model for SMS messages
+
+`LDiA` compared with `LSA(PCA)`: 
+
+> * `LSA (PCA)` tries to keep things spread apart that were spread apart to start with
+> * `LDiA` tries to keep things close together that started out close together
+> * `LDiA` twist and contort the space (and the vectors) in nonlinear way
+
+`LDiA` topic model for SMS messages:
+
+~~~python
+>>> from sklearn.feature_extraction.text import CountVectorizer
+>>> from nltk.tokenize import casual_tokenize
+>>> np.random.seed(42)
+
+>>> # create BOWs: LDiA works with raw BOW count vectors rather than normalized TF-IDF vectors 
+>>> counter = CountVectorizer(tokenizer=casual_tokenize)
+>>> bow_docs = pd.DataFrame(counter.fit_transform(raw_documents=sms.text)\
+...     .toarray(), index=index)
+>>> column_nums, terms = zip(*sorted(zip(counter.vocabulary_.values(),\
+...     counter.vocabulary_.keys())))
+>>> bow_docs.columns = terms
+
+>>> # double-check the counts make sense with sms0
+>>> sms.loc['sms0'].text
+'Go until jurong point, crazy.. Available only in bugis n great world la e
+buffet... Cine there got amore wat...'
+>>> bow_docs.loc['sms0'][bow_docs.loc['sms0'] > 0].head()
+,            1
+..           1
+...          2
+amore        1
+available    1
+Name: sms0, dtype: int64
+
+>>> # use LDiA to create topic vectors
+>>> from sklearn.decomposition import LatentDirichletAllocation as LDiA
+>>> ldia = LDiA(n_components=16, learning_method='batch') # try topic number 16 firstly as is in the LDA implementations
+>>> ldia = ldia.fit(bow_docs)
+>>> ldia.components_.shape  # the model allocated your 9,232 words (terms) to 16 topics (components)
+(16, 9232)
+
+>>> # topic->word matrix
+>>> pd.set_option('display.width', 75)
+>>> components = pd.DataFrame(ldia.components_.T, index=terms,\
+...     columns=columns)
+>>> components.round(2).head(3) # different output each time unless random-seed is fixed
+       topic0  topic1  topic2   ...     topic13  topic14  topic15
+!      184.03   15.00   72.22   ...      297.29    41.16    11.70
+"        0.68    4.22    2.41   ...       62.72    12.27     0.06
+#        0.06    0.06    0.06   ...        4.05     0.06     0.06
+
+>>> # exclamation point term (!) was allocated to most of the topics, but is a particularly strong (394) part of topic3
+>>> # check the topic 3, it is emphatic directives requesting someone to do something or pay something
+>>> components.topic3.sort_values(ascending=False)[:10]
+!       394.952246
+.       218.049724
+to      119.533134
+u       118.857546
+call    111.948541
+£       107.358914
+,        96.954384
+*        90.314783
+your     90.215961
+is       75.750037
+
+>>> # doc->topic matrix
+>>> # it is much more clean (a lot of zeros) compared with LDA matrix
+>>> ldia16_topic_vectors = ldia.transform(bow_docs)
+>>> ldia16_topic_vectors = pd.DataFrame(ldia16_topic_vectors,\
+...     index=index, columns=columns)
+>>> ldia16_topic_vectors.round(2).head()
+       topic0  topic1  topic2   ...     topic13  topic14  topic15
+sms0     0.00    0.62    0.00   ...        0.00     0.00     0.00
+sms1     0.01    0.01    0.01   ...        0.01     0.01     0.01
+sms2!    0.00    0.00    0.00   ...        0.00     0.00     0.00
+sms3     0.00    0.00    0.00   ...        0.00     0.00     0.00
+sms4     0.39    0.00    0.33   ...        0.00     0.00     0.00
+~~~
+
+Reference: 
+
+> [Appendix 4: why overfitting is a bad thing and how generalization can help](https://livebook.manning.com/book/natural-language-processing-in-action/appendix-d/app04)
+
+> `LDiA` matrix is more friendly with human reading, in next chapter will check how it works with machine
 
 ### 4.5.3. LDiA + LDA = spam classifier
 
+approach: use `LDiA topic vectors` to train an `LDA model` 
+
+`LDA model reference`: `4.1.5 LDA (Linear Discriminant Analysis) classifier`
+
+> implementation can be found in machine learning or NLP libs such as `sklearn`, but aslo a very simplified one is provided as below, which only has 3 steps: 
+>
+> * average position (centroid) of all the TF-IDF vectors within the class (such as spam SMS messages)
+> * average position (centroid) of all the TF-IDF vectors not in the class (such as nonspam SMS messages)
+> * vector difference between the centroids (the line that connects them)
+>
+> for the code, refer to the chapter 4.1.5
+
+`LDA model code using sklearn implementation`  
+
+~~~python
+>>> from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+>>> X_train, X_test, y_train, y_test = train_test_split(
+												   ldia16_topic_vectors,  // topic vectors
+												   sms.spam, 
+												   test_size=0.5, 
+												   random_state=271828
+											  )
+>>> lda = LDA(n_components=1)
+>>> lda = lda.fit(X_train, y_train)
+>>> sms['ldia16_spam'] = lda.predict(ldia16_topic_vectors)
+>>> round(float(lda.score(X_test, y_test)), 2)
+0.94
+~~~
+
+`Collinear Warning`
+
+> `collinear (共线性）warning` of the LDiA might occur if terms of some 2-gram or 3-gram alway occurs together, below is the code to find them
+
+~~~python
+>>> from itertools import product
+>>> all_pairs = [(word1, word2) for (word1, word2) in product(word_list,
+ word_list) if not word1 == word2]
+~~~
+
+> 	* The `collinear` is casued by the limited dataset, and will give LDA an “under-determined” problem.  For example, the `determinant` (行列式） of the topic-document matrix is close to zero, once discard half the documents with train_test_split
+> 	* Turn down the LDiA n_components can help to “fix” this issue, but it would tend to combine those topics together that are a linear combination of each other (collinear)
+
+Compare `LDA(LDiA) model` with a much higher dimension `LDA(TF-IDF) model`
+
+~~~python
+>>> from sklearn.feature_extraction.text import TfidfVectorizer
+>>> from nltk.tokenize.casual import casual_tokenize
+>>> tfidf = TfidfVectorizer(tokenizer=casual_tokenize)
+>>> tfidf_docs = tfidf.fit_transform(raw_documents=sms.text).toarray()
+>>> tfidf_docs = tfidf_docs - tfidf_docs.mean(axis=0) 
+ 
+>>> X_train, X_test, y_train, y_test = train_test_split(tfidf_docs,\
+...     sms.spam.values, test_size=0.5, random_state=271828)
+>>> lda = LDA(n_components=1)
+>>> lda = lda.fit(X_train, y_train)
+>>> round(float(lda.score(X_train, y_train)), 3)
+1.0    # training set score is perfect
+>>> round(float(lda.score(X_test, y_test)), 3)
+0.748  # testing set score is much worse (overfitting)
+~~~
+
 ### 4.5.4. A fairer comparison: 32 LDiA topics
+
+> let’s try increasing the dimensions by with LDiA topics from 16 to 32
+>
+> these topics are even more sparse, more cleanly separated
+
+~~~python
+>>> ldia32 = LDiA(n_components=32, learning_method='batch')
+>>> ldia32 = ldia32.fit(bow_docs)
+>>> ldia32.components_.shape
+(32, 9232)
+
+>>> ldia32_topic_vectors = ldia32.transform(bow_docs)
+>>> columns32 = ['topic{}'.format(i) for i in range(ldia32.n_components)]
+>>> ldia32_topic_vectors = pd.DataFrame(ldia32_topic_vectors, index=index,\
+...     columns=columns32)
+>>> ldia32_topic_vectors.round(2).head()
+       topic0  topic1  topic2   ...     topic29  topic30  topic31
+sms0     0.00     0.5     0.0   ...         0.0      0.0      0.0
+sms1     0.00     0.0     0.0   ...         0.0      0.0      0.0
+sms2!    0.00     0.0     0.0   ...         0.0      0.0      0.0
+sms3     0.00     0.0     0.0   ...         0.0      0.0      0.0
+sms4     0.21     0.0     0.0   ...         0.0      0.0      0.0
+~~~
+
+> train LDA model (classifier) training, this time using 32-D LDiA topic vectors
+>
+> * after using `32-D LDiA` there is no coline warning, but it does not means the problem has been solved
+> * the problem is happened on the underlying data, need to add “noise” or metadata s synthetic words, or need to delete those duplicate word vectors (if you have duplicate word vectors or word pairings that repeat a lot, no amount of topics is going to fix that) 
+>
+> larger number of topics allows it to be more precise about topics, and is useful for linear classification. but this is still not as good as the 96% accuracy of previouse `LDA(LDiA)`
+
+
+~~~python
+>>> X_train, X_test, y_train, y_test =
+ train_test_split(ldia32_topic_vectors, sms.spam, test_size=0.5,
+ random_state=271828)
+>>> lda = LDA(n_components=1)
+>>> lda = lda.fit(X_train, y_train)
+>>> sms['ldia32_spam'] = lda.predict(ldia32_topic_vectors)
+>>> X_train.shape
+(2418, 32)
+>>> round(float(lda.score(X_train, y_train)), 3)
+0.924
+>>> round(float(lda.score(X_test, y_test)), 3)
+0.927
+~~~
+
+> a small tip: read the python code
+
+~~~python
+>>> # source code path of a module: ${model_name}.__file__
+>>> # view source code of any class, function, object: ${target}??
+>>> import sklearn
+>>> sklearn.__file__
+'/Users/hobs/anaconda3/envs/conda_env_nlpia/lib/python3.6/site-packages/skl
+earn/__init__.py'
+>>> from sklearn.discriminant_analysis\
+...     import LinearDiscriminantAnalysis as LDA
+>>> LDA??
+Init signature: LDA(solver='svd', shrinkage=None, priors=None, n_components
+=None, store_covariance=False, tol=0.0001)
+Source:
+class LinearDiscriminantAnalysis(BaseEstimator, LinearClassifierMixin,
+                                 TransformerMixin):
+    """Linear Discriminant Analysis
+ 
+    A classifier with a linear decision boundary, generated by fitting
+    class conditional densities to the data and using Bayes' rule.
+ 
+    The model fits a Gaussian density to each class, assuming that all
+    classes share the same covariance matrix.
+...
+~~~
 
 ## 4.6. Distance and similarity
 
+> * similarity score (introduced in chapters 2 and 3) can help to check how good the model is at retaining those distances after dimensional reducing 
+> * `LSA` preserves large distances, but it doesn’t always preserve close distances (due to the underline `SVD`)
+
+choice of distance measurement: 
+
+> * `Euclidean` or `Cartesian distance`, or `root mean square error (RMSE)`: `2-norm` or L<sub>2</sub>
+> * `Squared Euclidean distance`, sum of `squares distance` (SSD): L<sub>2</sub><sup>2</sup>
+> * `Cosine` or `angular` or `projected` distance: `normalized dot product`
+> * `Minkowski distance`: `p-norm` or L<sub>p</sub>
+> * `Fractional distance`, `fractional norm`: `p-norm` or L<sub>p</sub> for 0 < p < 1
+> * `City block`, `Manhattan`, or `taxicab distance`; sum of absolute distance (`SAD`): -1-norm or L<sub>1</sub>
+> * `Jaccard distance`, inverse set similarity
+> * `Mahalanobis distance`
+> * `Levenshtein` or `edit distance`
+
+implementations: `sklearn.metrics.pairwise module`</br>
+doc: [http://scikit-learn.org/stable/modules/generated/sklearn.metrics.pairwise_distances.html](http://scikit-learn.org/stable/modules/generated/sklearn.metrics.pairwise_distances.html)
+
+~~~python
+'cityblock', 'cosine', 'euclidean', 'l1', 'l2', 'manhattan', 'braycurtis',
+'canberra', 'chebyshev', 'correlation', 'dice', 'hamming', 'jaccard',
+'kulsinski', 'mahalanobis', 'matching', 'minkowski', 'rogerstanimoto',
+'russellrao', 'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean',
+'yule'
+~~~
+
+more distance metrics: [http://numerics.mathdotnet.com/distance.html](https://numerics.mathdotnet.com/Distance.html)
+
+conversion between distance and similarity: 
+
+~~~python
+>>> similarity = 1. / (1. + distance)
+>>> distance = (1. / similarity) - 1.
+# for those range between 0 and 1, more common formula is like below
+>>> similarity = 1. - distance
+>>> distance = 1. - similarity
+~~~
+
+“[cosine similarity](https://en.wikipedia.org/wiki/Cosine_similarity)”
+
+~~~python
+>>> import math
+>>> angular_distance = math.acos(cosine_similarity) / math.pi
+>>> distance = 1. / similarity - 1.
+>>> similarity = 1. - distance
+~~~
+
+requirement of `METRICS`
+
+~~~text
+Nonnegativity: metrics can never be negative. metric(A, B) >= 0
+Indiscerniblity: two objects are identical if the metric between them is zero. if metric(A, B) == 0: assert(A == B)
+Symmetry: metrics don’t care about direction. metric(A, B) = metric(B, A)
+Triangle inequality: you can’t get from A to C faster by going through B in-between. metric(A, C) <= metric(A, B) + metric(B, C)
+~~~
+
 ## 4.7. Steering with feedback
+
+1. previous approaches (such as LSA) didn’t use documents similarity
+
+	> * `topics` were optimized `only` for `generic` set of rules, didn’t indicate how “close” the topic vectors `should be` to each other
+	> * `learned distance metrics` (Superpixel Graph Label Transfer with Learned Distance Metric: [http://users.cecs.anu.edu.au/~sgould/papers/eccv14-spgraph.pdf](http://users.cecs.anu.edu.au/~sgould/papers/eccv14-spgraph.pdf)) is an enhancement. it adjust the distance scores to force the vectors to focus on some aspect of the information
+
+2. meta information (such as SMS sender) should also be consisdered 
+
+3. another example: match `resume` and `job description` 
+
+	> * cosine similarity between `resume` and `job description` is one approach
+	> * but a much better way is “steering” topic vectors based on feedback from candidates and account managers (who help candidates to find a job), one approach is as below: 
+	> 	1. calculate the mean difference between your two centroids (like you did for `LDA`)
+	> 	2. add some portion of this “bias” to all the resume or job description vectors
+	>	3. get average topic vector difference between resumes and job descriptions
+	>	4. Topics such as beer on tap at lunch might appear in a job description but never in a resume. Similarly, bizarre hobbies, such as underwater scuplture, might appear in some resumes but never a job description
+	> * steering your topic vectors can help you focus them on the topics you’re interested in modeling
+	> * reference: 
+	>	1. search [Google Scholar](http://scholar.google.com/) for “learned distance/similarity metric” or “distance metrics for nonlinear embeddings.”
+	>	2. [“Distance Metric Learning: A Comprehensive Survey”](https://www.cs.cmu.edu/~liuy/frame_survey_v2.pdf)
+	> * however, there is no [`sklearn`](https://github.com/scikit-learn/scikit-learn/issues) implementation yet 
 
 ### 4.7.1. Linear discriminant analysis
 
+`LDA`(`Linear discriminant analysis`) 
+
+> * works similarly to `LSA`, except it requires `lassification labels` or `other scores` to be able to find the `best linear combinatio`n of the `dimensions` in high-dimensional space (BOW or TF-IDF) 
+> * maximizes the distance between the centroids of the vectors within each class
+
+to do: add introduction
+
+using `LDA` without dimension reducing, it is overfitting 
+
+~~~python
+>>> # training set score
+>>> lda = LDA(n_components=1)
+>>> lda = lda.fit(tfidf_docs, sms.spam)
+>>> sms['lda_spaminess'] = lda.predict(tfidf_docs)
+>>> ((sms.spam - sms.lda_spaminess) ** 2.).sum() ** .5
+0.0
+>>> (sms.spam == sms.lda_spaminess).sum()
+4837
+>>> len(sms)
+4837
+>>> # testing set score by cv
+>>> from sklearn.model_selection import cross_val_score
+>>> lda = LDA(n_components=1)
+>>> scores = cross_val_score(lda, tfidf_docs, sms.spam, cv=5)
+>>> "Accuracy: {:.2f} (+/-{:.2f})".format(scores.mean(), scores.std() * 2)
+'Accuracy: 0.76 (+/-0.03)'
+>>> # testing set score by 1/3 samples of dataset
+>>> from sklearn.model_selection import train_test_split
+>>> X_train, X_test, y_train, y_test = train_test_split(tfidf_docs,\
+...     sms.spam, test_size=0.33, random_state=271828)
+>>> lda = LDA(n_components=1)
+>>> lda.fit(X_train, y_train)
+LinearDiscriminantAnalysis(n_components=1, priors=None, shrinkage=None,
+              solver='svd', store_covariance=False, tol=0.0001)
+>>> lda.score(X_test, y_test).round(3)
+0.765
+~~~
+
+using `LDA` combined with `LSA` (topic vectors), it is much better
+
+~~~python
+>>> X_train, X_test, y_train, y_test = 
+ train_test_split(pca_topicvectors.values, sms.spam, test_size=0.3, 
+ random_state=271828)
+>>> lda = LDA(n_components=1)
+>>> lda.fit(X_train, y_train)
+LinearDiscriminantAnalysis(n_components=1, priors=None, shrinkage=None,
+              solver='svd', store_covariance=False, tol=0.0001)
+>>> lda.score(X_test, y_test).round(3)
+0.965
+>>> lda = LDA(n_components=1)
+>>> scores = cross_val_score(lda, pca_topicvectors, sms.spam, cv=10)
+>>> "Accuracy: {:.3f} (+/-{:.3f})".format(scores.mean(), scores.std() * 2)
+'Accuracy: 0.958 (+/-0.022)'
+~~~
+
 ## 4.8. Topic vector power
+
+> with topic vectors, you can do things like
+> 
+> 1. compare the meaning (of words, documents, statements, and corpora), not merely based on words
+> 2. find “clusters” of similar documents and statements
 
 ### 4.8.1. Semantic search
 
+> `full text search`: search for a document based on a word or partial word it contains
+> 
+> 1. break a document into chunks (usually words) that can be indexed (with `nverted index`)
+>	* it need to deal with spelling errors and typos
+>	* approach is “a full text index in a database like PostgreSQL is usually based on trigrams of characters”
+> 
+> 2. index `topic vector` with `inverted index`
+>	* `topic vector`s generated by `LSA` and `LDiA` is `high-dimensional continuous vectors`, which can not stored into `inverted index`
+>	* approach to solve this problem is “clustering high-dimensional data is equivalent to discretizing or indexing high-dimensional data with bounding boxes” (reference: [https://en.wikipedia.org/wiki/Clustering_high-dimensional_data](https://en.wikipedia.org/wiki/Clustering_high-dimensional_data))
+>
+> 3. speed up indexing for `dense` high dimensional vector
+>	* for `TF-IDF` vectors are sparse, which can save a lot of index entry (reference: ”[Inverted index](https://en.wikipedia.org/wiki/Inverted_index)”), however `topic-vector`s are `dense vector`s
+> 	* one solution is use `locality sensitive hash` (`LSH`), but the more dimension have, the worse it performed, details is in [https://dpzbhybb2pdcj.cloudfront.net/lane/Figures/04fig06_alt.jpg](https://dpzbhybb2pdcj.cloudfront.net/lane/Figures/04fig06_alt.jpg)
+> 
+> 4. how to find the most revelent documents
+>	* problem: O(N), N is the document number in corpus
+>	* optimization 1: `vectorize the operation` (reference: “[Vectorizing the Loops with Numpy](https://hackernoon.com/speeding-up-your-code-2-vectorizing-the-loops-with-numpy-e380e939bed3)”) in numpy using matrix multiplication can help but far from enough
+>	* optimization 2 (solution): “good enough” rather than perfect index (or LSH) for our high-dimensional vectors, belows are open source packages for `approximate nearest neighbors` algorithms on LSH in semantic search 
+>		* [Spotify’s Annoy package](https://github.com/spotify/annoy)
+>		* [Gensim’s gensim.models.KeyedVector class](https://radimrehurek.com/gensim/models/keyedvectors.html)
+>		* reference: [Appendix E of this book](https://livebook.manning.com/book/natural-language-processing-in-action/appendix-e/app05)
+
+
 ### 4.8.2. Improvements
+
+next chapters are about how to fine tune this concept of topic vectors so that the vectors associated with words are more precise and useful
+
+## Appendix：Code
+
+> LSA
+>
+> * [ch04_catdog_lsa_3x6x16.py](../src/nlpia/book/examples/ch04_catdog_lsa_3x6x16.py)
+> * [ch04_catdog_lsa_4x8x200.py](../src/nlpia/book/examples/ch04_catdog_lsa_4x8x200.py)
+> * [ch04_catdog_lsa_9x4x12.py](../src/nlpia/book/examples/ch04_catdog_lsa_9x4x12.py)
+> * [ch04_catdog_lsa_sorted.py](../src/nlpia/book/examples/ch04_catdog_lsa_sorted.py)
+> * [ch04_stanford_lsa.py](../src/nlpia/book/examples/ch04_stanford_lsa.py)
+> 
+> LDA
+>
+> * [ch04_spam_lda.py](../src/nlpia/book/examples/ch04_spam_lda.py)
+> > PCA
+> 
+> * [ch04_sklearn_pca_source.py](../src/nlpia/book/examples/ch04_sklearn_pca_source.py)
+>
+> SVD 
+> 
+> * [ch04.svdfail.py](../src/nlpia/book/examples/ch04.svdfail.py)
+> 
+> examples of this chapter
+> 
+> * [ch04.py](../src/nlpia/book/examples/ch04.py)
+> 
+> others
+> 
+> * [ch4_fix_accuracy_discrepancy.py](../src/nlpia/book/examples/ch4_fix_accuracy_discrepancy.py)
+> * [ch04_horse.py](../src/nlpia/book/examples/ch04_horse.py)
+> * [ch04_ldia_comparison.py](../src/nlpia/book/examples/ch04_ldia_comparison.py)
+
+
+
 
